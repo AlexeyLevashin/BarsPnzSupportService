@@ -1,0 +1,40 @@
+  version: "3.9"
+  
+  services:
+    db:
+      image: postgres:16-alpine
+      restart: always
+      container_name: bars_db
+      environment:
+        POSTGRES_PASSWORD: bars12345
+        POSTGRES_DB: BarsSupportDb
+        POSTGRES_USER: bars
+  
+      ports:
+        - '5432:5432'
+  
+      volumes:
+        - pgdata:/var/lib/postgresql/data
+      networks:
+        - backend
+    redis:
+      image: redis:alpine
+      container_name: bars_redis
+      restart: always
+      ports:
+        - '6379:6379'
+      command: redis-server --save 60 1 --loglevel warning
+      volumes:
+        - redisdata:/data
+      networks:
+        - backend
+  
+  
+  networks:
+    backend:
+      driver: bridge
+  
+  
+  volumes:
+    pgdata:
+    redisdata:
