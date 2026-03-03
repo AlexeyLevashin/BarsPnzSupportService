@@ -1,16 +1,14 @@
 ﻿using Domain.Enums;
 
-namespace Domain.DbModels;
+namespace Application.Dto.Users.Responses;
 
-public class DbUser
+public class GetUserResponse
 {
-    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid Id { get; set; }
     public string Name { get; set; }
     public string Surname { get; set; }
     public string? Patronymic { get; set; }
     public string Email { get; set; }
-    public string PasswordHash { get; set; }
     public UserRole Role { get; set; }
     public Guid? InstitutionId { get; set; }
-    public DbInstitution? Institution { get; set; }
-}   
+}

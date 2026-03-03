@@ -21,13 +21,12 @@ public class RegisterRequest
     public string Email { get; set; }
     
     [Required(ErrorMessage = "Пароль обязателен для заполнения")]
-    [MinLength(1, ErrorMessage = "Пароль не может быть пустым")]
+    [MinLength(6, ErrorMessage = "Длина пароля должна быть не меньше 6 символов")]
     public string Password { get; set; }
     
     [Required(ErrorMessage = "Подтверждение пароля обязательно")]
     [Compare("Password", ErrorMessage = "Пароли не совпадают")] 
     public string ConfirmPassword { get; set; }
     
-    [Range(0, int.MaxValue, ErrorMessage = "ID компании не может быть отрицательным.")]
-    public int? InstitutionId { get; set; }
+    public Guid? InstitutionId { get; set; }
 }

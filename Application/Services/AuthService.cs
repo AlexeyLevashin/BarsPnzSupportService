@@ -42,14 +42,14 @@ public class AuthService : IAuthService
             throw new Exception("Неверный логин или пароль");
         }
 
-        var accsessToken = _jwtProvider.GenerateAccessToken(user);
+        var accessToken = _jwtProvider.GenerateAccessToken(user);
         var refreshToken = _jwtProvider.GenerateRefreshToken();
 
         await SaveRefreshTokenToRedis(user.Id, refreshToken);
         
         return new LoginSuccessResponse
         {
-            AccessToken = accsessToken, RefreshToken = refreshToken
+            AccessToken = accessToken, RefreshToken = refreshToken
         };
     }
 
@@ -64,7 +64,7 @@ public class AuthService : IAuthService
 
         if (request.InstitutionId != null)
         {
-            var institution = await _institutionRepository.GetByIdAsync((int)request.InstitutionId);
+            var institution = await _institutionRepository.GetByIdAsync((Guid)request.InstitutionId);
             if (institution is null)
             {
                 throw new Exception("Данного учреждения не существует в системе");
@@ -77,18 +77,19 @@ public class AuthService : IAuthService
         await _userRepository.AddAsync(newUser);
         await _unitOfWork.SaveChangesAsync();
 
-        var accsessToken = _jwtProvider.GenerateAccessToken(newUser);
+        var accessToken = _jwtProvider.GenerateAccessToken(newUser);
         var refreshToken = _jwtProvider.GenerateRefreshToken();
 
         await SaveRefreshTokenToRedis(newUser.Id, refreshToken);
         
         return new LoginSuccessResponse
         {
-            AccessToken = accsessToken, RefreshToken = refreshToken
+            AccessToken = accessToken, 
+            RefreshToken = refreshToken
         };
     }
 
-    private async Task SaveRefreshTokenToRedis(int userId, string refreshToken)
+    private async Task SaveRefreshTokenToRedis(Guid userId, string refreshToken)
     {
         var key = $"rt:{refreshToken}";
 

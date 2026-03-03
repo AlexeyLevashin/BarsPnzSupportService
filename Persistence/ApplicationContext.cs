@@ -23,27 +23,17 @@ public class ApplicationContext : DbContext
             entity.HasIndex(u => u.Email).IsUnique();
 
             entity.Property(u => u.Role).HasConversion<string>();
-
-            entity.HasOne(u => u.Institution)
-                .WithMany()
-                .HasForeignKey(u => u.InstitutionId)
-                .OnDelete(DeleteBehavior.Restrict);
             
             entity.HasOne(u => u.Institution)
                 .WithMany(i => i.Users)
                 .HasForeignKey(u => u.InstitutionId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<DbMessage>(entity =>
         {
             entity.Property(m => m.Type).HasConversion<string>();
             entity.HasIndex(m => new { m.RequestId, m.CreatedAt });
-            
-            entity.HasOne(m => m.Request)
-                .WithMany()
-                .HasForeignKey(m => m.RequestId)
-                .OnDelete(DeleteBehavior.Cascade);
             
             entity.HasOne(m => m.Request)
                 .WithMany(r => r.Messages) 

@@ -29,7 +29,7 @@ public class InstitutionRepository : IInstitutionRepository
         _context.Institutions.Remove(dbInstitution);
     }
 
-    public async Task<DbInstitution?> GetByIdAsync(int id)
+    public async Task<DbInstitution?> GetByIdAsync(Guid id)
     {
         return await _context.Institutions.FirstOrDefaultAsync(i => i.Id == id);
     }
@@ -37,5 +37,17 @@ public class InstitutionRepository : IInstitutionRepository
     public async Task<DbInstitution?> GetByInnAsync(string inn)
     {
         return await _context.Institutions.FirstOrDefaultAsync(i => i.INN == inn);
+    }
+
+    public async Task<(List <DbInstitution> Institutions, int totalCount)> GetAllAsync(int pageNumber, int pageSize)
+    {
+        var query = _context.Institutions.AsNoTracking();
+        var count = await query.CountAsync();
+        var institutions = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (institutions, count);
     }
 }

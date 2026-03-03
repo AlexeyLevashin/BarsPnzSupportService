@@ -28,6 +28,11 @@ public class JwtProvider : IJwtProvider
             new Claim(ClaimTypes.Role, user.Role.ToString())
         };
         
+        if (user.InstitutionId.HasValue)
+        {
+            claims.Add(new Claim("InstitutionId", user.InstitutionId.Value.ToString()));
+        }
+        
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 

@@ -1,7 +1,10 @@
-﻿using Application.Dto.Institutions.Requests;
+﻿using Application.Common.Pagination;
+using Application.Dto.Institutions.Requests;
+using Application.Dto.Users.Requests;
 using Application.Dto.Users.Responses;
 using Application.Interfaces;
 using Domain.DbModels;
+using Domain.Enums;
 using Domain.Interfaces;
 using Mapster;
 
@@ -21,9 +24,42 @@ public class UserService : IUserService
         _unitOfWork = unitOfWork;
         _passwordService = passwordService;
     }
-    
-    public async Task<CreateUserResponse> AddAsync(CreateUseryByAdminRequest request)
+
+    public async Task<GetUserResponse> GetMeAsync(Guid userId)
     {
+        if (Guid.Empty == userId)
+        {
+            throw new Exception("ID пользователя не может быть пустым");
+        }
+        
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user is null)
+        {
+            throw new Exception("Пользователь с указанным ID не найден");
+        }
+        
+        return user.Adapt<GetUserResponse>();
+    }
+    
+    public async Task<CreateUserResponse> AddAsync(CreateUserByAdminRequest request, Guid userId, UserRole userRole, Guid? institutionId)
+    {
+        if (userRole == UserRole.UserAdmin)
+        {
+            request.Role = UserRole.User;
+            request.InstitutionId = institutionId;
+        }
+        
+        if (userRole == UserRole.Operator && request.Role == UserRole.SuperAdmin)
+        {
+            throw new Exception("Оператор не может добавлять суперадмина");
+        }
+
+        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
+        {
+            throw new Exception("Пользователь должен быть привязан к учреждению");
+        }
+        
         var user = await _userRepository.GetByEmailAsync(request.Email);
         
         if (user is not null)
@@ -33,7 +69,7 @@ public class UserService : IUserService
 
         if (request.InstitutionId != null)
         {
-            var institution = await _institutionRepository.GetByIdAsync((int)request.InstitutionId);
+            var institution = await _institutionRepository.GetByIdAsync(request.InstitutionId.Value);
 
             if (institution is null)
             {
@@ -52,13 +88,178 @@ public class UserService : IUserService
         return response;
     }
 
-    // public Task<DbUser> UpdateAsync(UpdateUserDto updateUserDto)
-    // {
-    //     throw new NotImplementedException();
-    // }
-    //
-    // public Task<DbUser> DeleteAsync(CreateUserDto createUserDto)
-    // {
-    //     throw new NotImplementedException();
-    // }
+    public async Task<PagedResponse<GetUserResponse>> GetAllUsers(int pageNumber, int pageSize, UserRole userRole, Guid? institutionId)
+    { 
+        if (pageNumber < 1) pageNumber = 1;
+
+        if (pageSize < 1) pageSize = 20;
+
+        if (pageSize > 50) pageSize = 50;
+        
+        Guid? filterInstitutionId = null;
+
+        if (userRole == UserRole.UserAdmin)
+        {
+            if (institutionId is null)
+            {
+                throw new Exception("Произошла ошибка, пользователь запрашивающий данные, должен быть привязан к учрежению");
+            }
+            filterInstitutionId = institutionId;
+        }
+        var usersInfo = await _userRepository.GetAllAsync(pageNumber, pageSize, filterInstitutionId);
+        var users = usersInfo.Users.Adapt<List<GetUserResponse>>();
+        
+        return new PagedResponse<GetUserResponse>
+        {
+            Items = users,
+            PageInfo = new PageViewModel(pageNumber, usersInfo.totalCount, pageSize)
+        };
+    }
+
+    public async Task<GetUserResponse> UpdateAsync(CreateUserByAdminRequest request, Guid userId, Guid id, UserRole userRole, Guid? institutionId)
+    {
+        var userToUpdate = await _userRepository.GetByIdAsync(id);
+        if (userToUpdate is null)
+        {
+            throw new Exception("Пользователя с данным ID не существует в системе");
+        }
+        
+        if (userId != id && userRole == UserRole.User)
+        {
+            throw new Exception("Пользователь не может изменять других пользователей");
+        }
+        
+        if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || userToUpdate.InstitutionId != institutionId))
+        {
+            throw new Exception("Администратор учреждения может изменять только обычных пользователей и только в пределах своего учреждения");
+        }
+
+        if (userRole == UserRole.UserAdmin || userRole == UserRole.User)
+        {
+            request.Role = (userId == id) ? userToUpdate.Role : UserRole.User;
+            request.InstitutionId = institutionId;
+        }
+
+        if (userRole == UserRole.Operator && request.Role == UserRole.SuperAdmin)
+        {
+            throw new Exception("Оператор не может выдавать права суперадмина");
+        }
+
+        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
+        {
+            throw new Exception("Пользователь должен быть привязан к учреждению");
+        }
+        
+        if (userId != id && userRole == UserRole.Operator && userToUpdate.Role == UserRole.SuperAdmin)
+        {
+            throw new Exception("У вас нет прав на изменение данного пользователя");
+        }
+
+        var checkEmailExist = await _userRepository.GetByEmailAsync(request.Email);
+        if (checkEmailExist is not null && checkEmailExist.Id != id)
+        {
+            throw new Exception("Пользователь с данным Email уже существует");
+        }
+        
+        if  (request.InstitutionId != null)
+        {
+            var institution = await _institutionRepository.GetByIdAsync(request.InstitutionId.Value);
+
+            if (institution is null)
+            {
+                throw new Exception("Учреждение не существует");
+            }
+        }
+
+        request.Adapt(userToUpdate);
+        _userRepository.UpdateAsync(userToUpdate);
+        await _unitOfWork.SaveChangesAsync();
+
+        var response = userToUpdate.Adapt<GetUserResponse>();
+        return response;
+    }
+
+    public async Task UpdatePasswordAsync(UpdateUserPasswordRequest request, Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user is null)
+        {
+            throw new Exception("Пользователя с данным ID не существует в системе");
+        }
+
+        if (!_passwordService.Verify(request.Password, user.PasswordHash))
+        {
+            throw new Exception("Задан неверный пароль");
+        }
+
+        user.PasswordHash = _passwordService.Hash(request.NewPassword);
+        _userRepository.UpdateAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole, Guid? institutionId)
+    {
+        // todo Когда будет реализована работа с почтой, раскомментить проверку
+        // if (userId == id)
+        // {
+        //     throw new Exception("Нельзя поменять пароль без подтверждения почты самому себе");
+        // }
+        var userToUpdate = await _userRepository.GetByIdAsync(id);
+        if (userToUpdate is null)
+        {
+            throw new Exception("Пользователя с данным ID не существует в системе");
+        }
+
+        if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || userToUpdate.InstitutionId != institutionId))
+        {
+            throw new Exception("У вас нет прав на изменение пароля для данного пользователя");
+        }
+        
+        if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
+        {
+            throw new Exception("У вас нет прав на изменение пароля для данного пользователя");
+        }
+        
+        var newPassword = _passwordService.GeneratePassword();
+        userToUpdate.PasswordHash = _passwordService.Hash(newPassword);
+        _userRepository.UpdateAsync(userToUpdate);
+        await _unitOfWork.SaveChangesAsync();
+
+        var response = userToUpdate.Adapt<CreateUserResponse>();
+        response.InitialPassword = newPassword;
+        return response;
+    }
+
+    public async Task DeleteAsync(Guid userId, Guid id, UserRole userRole, Guid? institutionId)
+    {
+        if (userId == id)
+        {
+            throw new Exception("Нельзя удалить самого себя");
+        }
+        
+        var userToDelete = await _userRepository.GetByIdAsync(id);
+        
+        if (userToDelete is null)
+        {
+            throw new Exception("Пользователя с данным ID не существует в системе");
+        }
+        
+        if (userRole == UserRole.UserAdmin && userToDelete.Role != UserRole.User)
+        {
+            throw new Exception("У вас нет прав на удаление этого пользователя");
+        }
+
+        if (userRole == UserRole.UserAdmin && institutionId != userToDelete.InstitutionId)
+        {
+            throw new Exception("Нельзя удалить пользователя не из своего учреждения");
+        }
+
+        if (userRole == UserRole.Operator && userToDelete.Role == UserRole.SuperAdmin)
+        {
+            throw new Exception("У вас нет прав на удаление главного администратора");
+        }
+
+        _userRepository.DeleteAsync(userToDelete);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

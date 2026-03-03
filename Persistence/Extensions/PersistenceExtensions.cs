@@ -1,6 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Domain.DbModels;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Persistence.Initialize;
 
 namespace Persistence.Extensions;
 
@@ -11,6 +14,14 @@ public static class PersistenceExtensions
         services.AddDatabaseContext(configuration);
 
         return services;
+    }
+
+    public static async Task UseDbInitializer(this IHost app)
+    {
+        using var scope = app.Services.CreateScope();
+        var services = scope.ServiceProvider;
+
+        await DbInitializer.Initialize(services);
     }
 
     public static IServiceCollection AddDatabaseContext(this IServiceCollection services, IConfiguration configuration)

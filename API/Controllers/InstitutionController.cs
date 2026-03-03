@@ -16,10 +16,38 @@ public class InstitutionController : BaseController
         _institutionService = institutionService;
     }
 
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMy()
+    {
+        return Ok(await _institutionService.GetMy(InstitutionId));
+    }
+    
     [HttpPost]
-    [Authorize(Roles = "Operator")]
+    [Authorize(Roles = "SuperAdmin, Operator")]
     public async Task<IActionResult> Add(CreateInstitutionRequest request)
     {
         return Ok(await _institutionService.AddAsync(request));
+    }
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin, Operator")]
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        return Ok(await _institutionService.GetAllAsync(page, pageSize));
+    }
+
+    [HttpPut ("{id}")]
+    [Authorize(Roles = "SuperAdmin, Operator")]
+    public async Task<IActionResult> Update(Guid id, CreateInstitutionRequest request)
+    {
+        return Ok(await _institutionService.UpdateAsync(request, id));
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "SuperAdmin, Operator")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _institutionService.DeleteAsync(id);
+        return NoContent();
     }
 }

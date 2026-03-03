@@ -39,6 +39,8 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+await app.UseDbInitializer();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

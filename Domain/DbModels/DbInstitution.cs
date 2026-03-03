@@ -2,7 +2,7 @@
 
 public class DbInstitution
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; } = Guid.CreateVersion7();
     public string Name { get; set; }
     public string INN { get; set; }
     public string? HeadName { get; set; }

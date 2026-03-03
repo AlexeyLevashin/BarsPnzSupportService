@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Domain.Enums;
 
 namespace API.Controllers.Abstractions;
 
@@ -9,18 +10,18 @@ namespace API.Controllers.Abstractions;
 [Authorize]
 public abstract class BaseController : ControllerBase
 {
-    protected int UserId
+    protected Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) 
+                                        ?? throw new UnauthorizedAccessException());
+    
+    protected UserRole UserRole => Enum.Parse<UserRole>(User.FindFirstValue(ClaimTypes.Role) 
+                                                        ?? throw new UnauthorizedAccessException());
+    
+    protected Guid? InstitutionId
     {
         get
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-
-            if (userIdClaim == null)
-            {
-                throw new UnauthorizedAccessException();
-            }
-
-            return int.Parse(userIdClaim.Value);
+            var claim = User.FindFirstValue("InstitutionId");
+            return claim != null ? Guid.Parse(claim) : null;
         }
     }
 }

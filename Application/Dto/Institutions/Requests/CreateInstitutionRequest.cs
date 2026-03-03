@@ -12,12 +12,9 @@ public class CreateInstitutionRequest
     [RegularExpression(@"^(\d{10}|\d{12})$", ErrorMessage = "ИНН должен состоять из 10 или 12 цифр")]
     public string INN { get; set; }
     
-    [MinLength(1, ErrorMessage = "Имя главврача не может быть пустым")]
     public string? HeadName { get; set; }
     
-    [MinLength(1, ErrorMessage = "Фамилия главврача не может быть пустой")]
     public string? HeadSurname { get; set; }
     
-    [MinLength(1, ErrorMessage = "Отчество главврача не может быть   пустым")]
     public string? HeadPatronymic { get; set; }
 }
