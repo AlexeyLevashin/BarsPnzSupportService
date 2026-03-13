@@ -9,7 +9,7 @@ namespace API.Controllers;
 [Route("api/institutions")]
 public class InstitutionController : BaseController
 {
-    private IInstitutionService _institutionService;
+    private readonly IInstitutionService _institutionService;
 
     public InstitutionController(IInstitutionService institutionService)
     {

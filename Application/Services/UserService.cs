@@ -140,9 +140,9 @@ public class UserService : IUserService
             request.InstitutionId = institutionId;
         }
 
-        if (userRole == UserRole.Operator && request.Role == UserRole.SuperAdmin)
+        if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin || request.Role == UserRole.Operator))
         {
-            throw new Exception("Оператор не может выдавать права суперадмина");
+            throw new Exception("Оператор не может выдавать такие права");
         }
 
         if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
@@ -150,7 +150,7 @@ public class UserService : IUserService
             throw new Exception("Пользователь должен быть привязан к учреждению");
         }
         
-        if (userId != id && userRole == UserRole.Operator && userToUpdate.Role == UserRole.SuperAdmin)
+        if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
         {
             throw new Exception("У вас нет прав на изменение данного пользователя");
         }
@@ -254,9 +254,9 @@ public class UserService : IUserService
             throw new Exception("Нельзя удалить пользователя не из своего учреждения");
         }
 
-        if (userRole == UserRole.Operator && userToDelete.Role == UserRole.SuperAdmin)
+        if (userRole == UserRole.Operator && (userToDelete.Role == UserRole.SuperAdmin || userToDelete.Role == UserRole.Operator))
         {
-            throw new Exception("У вас нет прав на удаление главного администратора");
+            throw new Exception("У вас нет прав на удаление данного пользователя");
         }
 
         _userRepository.DeleteAsync(userToDelete);

@@ -1,4 +1,7 @@
-﻿using Application.Authentication;
+﻿using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using Application.Authentication;
 using Application.Dto.Authorization.Requests;
 using Application.Dto.Authorization.Responses;
 using Application.Interfaces;
@@ -19,18 +22,14 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordService _passwordService;
     private readonly IJwtProvider _jwtProvider;
-    private readonly JwtOptions _jwtOptions;
-    private readonly IDistributedCache _cache;
 
-    public AuthService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IJwtProvider jwtProvider, IOptions<JwtOptions> jwtOptions, IDistributedCache cache)
+    public AuthService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IJwtProvider jwtProvider)
     {
         _userRepository = userRepository;
         _institutionRepository = institutionRepository;
         _unitOfWork = unitOfWork;
         _passwordService = passwordService;
         _jwtProvider = jwtProvider;
-        _jwtOptions = jwtOptions.Value;
-        _cache = cache;
     }
 
     public async Task<LoginSuccessResponse> LoginAsync(LoginRequest request)
@@ -43,9 +42,7 @@ public class AuthService : IAuthService
         }
 
         var accessToken = _jwtProvider.GenerateAccessToken(user);
-        var refreshToken = _jwtProvider.GenerateRefreshToken();
-
-        await SaveRefreshTokenToRedis(user.Id, refreshToken);
+        var refreshToken = _jwtProvider.GenerateRefreshToken(user);
         
         return new LoginSuccessResponse
         {
@@ -78,27 +75,41 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync();
 
         var accessToken = _jwtProvider.GenerateAccessToken(newUser);
-        var refreshToken = _jwtProvider.GenerateRefreshToken();
-
-        await SaveRefreshTokenToRedis(newUser.Id, refreshToken);
+        var refreshToken = _jwtProvider.GenerateRefreshToken(newUser);
         
         return new LoginSuccessResponse
         {
-            AccessToken = accessToken, 
-            RefreshToken = refreshToken
+            AccessToken = accessToken, RefreshToken = refreshToken
         };
     }
 
-    private async Task SaveRefreshTokenToRedis(Guid userId, string refreshToken)
+    public async Task<LoginSuccessResponse> RefreshTokenAsync(RefreshRequest request)
     {
-        var key = $"rt:{refreshToken}";
+        var principal = _jwtProvider.ValidateToken(request.RefreshToken);
+        if (principal is null)
+        {
+            throw new Exception("Невалидный или просроченный Refresh-токен");
+        }
 
-        await _cache.SetStringAsync(
-            key,
-            userId.ToString(),
-            new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(_jwtOptions.RefreshTokenExpiresDays)
-            });
+        var userIdString = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
+        {
+            throw new Exception("Ошибка чтения токена: неверный формат ID пользователя.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null)
+        {
+            throw new Exception("Пользователь не найден в системе");
+        }
+
+        var newAccessToken = _jwtProvider.GenerateAccessToken(user);
+        var newRefreshToken = _jwtProvider.GenerateRefreshToken(user);
+
+        return new LoginSuccessResponse
+        {
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken
+        };
     }
 }

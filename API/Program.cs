@@ -41,11 +41,18 @@ var app = builder.Build();
 
 await app.UseDbInitializer();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c => 
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "BarsPnz API v1");
+});
+
+//todo расскомментить на проде
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -17,15 +17,13 @@ public static class InfrastructureExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IJwtProvider, JwtProvider>();
-        services.AddStackExchangeRedisCache(options =>
-        {
-            options.Configuration = configuration.GetConnectionString("Redis");
-            options.InstanceName = "BarsPnz_";
-        });
+
         services.AddAuthentication(configuration);
 
         services.AddScoped<IInstitutionRepository, InstitutionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRequestRepository, RequestRepository>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddMappings();
@@ -38,6 +36,23 @@ public static class InfrastructureExtensions
         var jwtSettings = configuration.GetSection("JwtSettings");
         services.Configure<JwtOptions>(jwtSettings);
 
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!)),
+            //ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        services.AddSingleton(tokenValidationParameters);
+        
         services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -46,20 +61,7 @@ public static class InfrastructureExtensions
             })
             .AddJwtBearer(options =>
             {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-
-                    ValidIssuer = jwtSettings["Issuer"],
-                    ValidAudience = jwtSettings["Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!)),
-                    //ClockSkew = TimeSpan.Zero
-                    ClockSkew = TimeSpan.FromMinutes(1)
-                };
+                options.TokenValidationParameters = tokenValidationParameters;
             });
         return services;
     }
